@@ -19,7 +19,7 @@ def select_models():
     model_names = [os.path.basename(p) for p in pt_files]
     selected_models = st.sidebar.multiselect("Seleziona i modelli", model_names, default=model_names[:1])
     return {model: YOLO(os.path.join(models_dir, model)) for model in selected_models}
-
+ 
 def select_source():
     return st.sidebar.selectbox("Seleziona la sorgente", ["webcam", "video", "image"])
 
