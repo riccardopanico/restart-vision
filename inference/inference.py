@@ -7,12 +7,12 @@ from ultralytics import YOLO
 class InferenceEngine:
     """Classe per eseguire inferenza YOLOv8 separata dalla UI."""
 
-    def __init__(self, models, source_type, source, session_id, static_class_name=None, **params):
+    def __init__(self, models, source_type, source, session_id, static_class_id=None, **params):
         self.models = models
         self.source_type = source_type
         self.source = source
         self.session_id = session_id
-        self.static_class_name = static_class_name  # ✅ Memorizziamo la classe fissa
+        self.static_class_id = static_class_id  # ✅ Memorizziamo l'ID fisso scelto dall'utente
         self.params = params
         self.detected_classes = set()  # Traccia le classi rilevate
 
@@ -50,33 +50,33 @@ class InferenceEngine:
         }
         
     def _save_yolo_labels(self, labels_dir, model_name, frame_counter, results):
-        """Salva le etichette YOLO in un file di testo e assegna l'ID statico alla classe selezionata."""
+        """Salva tutte le etichette YOLO in un file di testo, assegnando sempre la classe selezionata nel radio button."""
         label_file = os.path.join(labels_dir, f"frame_{frame_counter}.txt")
 
-        print(f"🔍 DEBUG: Salvataggio labels in {label_file}")
+        print(f"🔍 DEBUG: Tentativo di salvataggio labels in {label_file} per modello {model_name}")
+
+        # Se non ci sono detections, non salvare nulla
+        if not results[0].boxes or len(results[0].boxes) == 0:
+            print(f"⚠️ ATTENZIONE: Nessuna detections per {model_name} nel frame {frame_counter}.")
+            return
+
+        print(f"✅ DEBUG: {len(results[0].boxes)} oggetti rilevati per {model_name}")
 
         with open(label_file, "w") as f:
             for box in results[0].boxes:
                 original_class_id = int(box.cls)
 
-                # ✅ Ottieni la mappa delle classi YOLO
-                class_name_mapping = self.models[model_name].names  # Dizionario {id: 'nome_classe'}
+                # ✅ Imposta sempre la classe selezionata dal radio button
+                new_class_id = self.static_class_id  # <-- Usa il valore scelto dall'utente
 
-                # ✅ Trova il corrispondente class_id per `static_class_name`
-                new_class_id = None
-                for id, name in class_name_mapping.items():
-                    if name == self.static_class_name:
-                        new_class_id = id
-                        break  # Fermati non appena troviamo il match
-
-                if new_class_id is None:
-                    print(f"⚠️ ERRORE: La classe '{self.static_class_name}' non è stata trovata tra i nomi YOLO!")
-                    continue  # Saltiamo questa iterazione se non troviamo la classe
-
-                print(f"✅ DEBUG: Classe originale {original_class_id}, nuova classe {new_class_id} ({self.static_class_name})") 
-
+                # ✅ Debug dettagliato
                 x_center, y_center, width, height = box.xywhn.tolist()[0]
+                print(f"✅ DEBUG: {model_name} → Classe originale {original_class_id}, assegnata nuova classe {new_class_id} (scelta dall'utente), BBox: ({x_center}, {y_center}, {width}, {height})") 
+
+                # ✅ Scriviamo nel file `.txt`
                 f.write(f"{new_class_id} {x_center} {y_center} {width} {height}\n")
+
+        print(f"✅ DEBUG: File labels salvato correttamente in {label_file} per {model_name}")
 
     def _generate_data_yaml(self, output_dir, static_class_name):
         """Genera il file data.yaml con un solo ID fisso per tutte le classi selezionate."""
@@ -106,18 +106,24 @@ class InferenceEngine:
             print(f"❌ ERRORE: Impossibile scrivere il file data.yaml! Errore: {e}")
 
     def _process_image(self, grid):
-        """Inferenza su immagine."""
+        """Inferenza su immagine per tutti i modelli selezionati."""
         frame = cv2.imread(self.source)
         if frame is None:
             st.error("Errore nel caricamento dell'immagine.")
             return
 
         for model_name, model in self.models.items():
+            print(f"🔍 DEBUG: Elaborazione immagine con modello {model_name}")
+
             output_dirs = self._create_output_dir(model_name)
             row_idx, col_idx = divmod(list(self.models.keys()).index(model_name), len(grid[0]))
 
             model.to(self.params["device"])
             results = model(frame, conf=self.params["confidence"], iou=self.params["iou_threshold"])
+
+            # ✅ Debug: Controlliamo i risultati del modello
+            print(f"✅ DEBUG: {model_name} ha rilevato {len(results[0].boxes)} oggetti")
+
             annotated_frame = results[0].plot()
 
             if self.params["output_resolution"]:
@@ -127,18 +133,15 @@ class InferenceEngine:
 
             if self.params["save_output"]:
                 frame_to_save = annotated_frame if self.params["save_annotated_frames"] else frame
-                cv2.imwrite(os.path.join(output_dirs["images"], "train", "frame_0.jpg"), frame_to_save)
+                image_path = os.path.join(output_dirs["images"], "train", "frame_0.jpg")
+                cv2.imwrite(image_path, frame_to_save)
+                print(f"✅ DEBUG: Immagine salvata in {image_path} per modello {model_name}")
 
                 if self.params["save_labels"]:
                     self._save_yolo_labels(os.path.join(output_dirs["labels"], "train"), model_name, 0, results)
 
-        if self.params["save_labels"]:
-            for model_name in self.models.keys():
-                output_dir = self._create_output_dir(model_name)["base"]
-                self._generate_data_yaml(output_dir)
-
     def _process_video(self, grid):
-        """Inferenza su video o webcam."""
+        """Inferenza su video per tutti i modelli selezionati."""
         cap = cv2.VideoCapture(self.source)
         if not cap.isOpened():
             st.error("Errore nell'apertura del video o webcam.")
@@ -147,23 +150,8 @@ class InferenceEngine:
         stop_button = st.sidebar.button("Stop Inferenza")
         frame_holders = [col.empty() for row in grid for col in row]
 
-        if self.params["output_resolution"]:
-            frame_size = self.params["output_resolution"]
-        else:
-            frame_size = (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
-
         output_dirs = {
             model_name: self._create_output_dir(model_name)
-            for model_name in self.models.keys()
-        }
-
-        writers = {
-            model_name: cv2.VideoWriter(
-                os.path.join(output_dirs[model_name]["videos"], "output.avi"),
-                cv2.VideoWriter_fourcc(*"XVID"),
-                20.0,
-                frame_size
-            ) if self.params["save_output"] and self.params["save_video"] else None
             for model_name in self.models.keys()
         }
 
@@ -178,40 +166,19 @@ class InferenceEngine:
                 frame_counter += 1
 
                 for i, (model_name, model) in enumerate(self.models.items()):
+                    print(f"🔍 DEBUG: Elaborazione frame {frame_counter} con modello {model_name}")
+
                     model.to(self.params["device"])
                     results = model(frame, conf=self.params["confidence"], iou=self.params["iou_threshold"])
+
+                    print(f"✅ DEBUG: {model_name} ha rilevato {len(results[0].boxes)} oggetti")
+
                     annotated_frame = results[0].plot()
                     frame_holders[i].image(annotated_frame, channels="BGR")
 
-                    if self.params["save_output"] and frame_counter % self.params["frame_skip"] == 0:
-                        output_dir = output_dirs[model_name]
-                        frame_to_save = annotated_frame if self.params["save_annotated_frames"] else frame
-                        if self.params["output_resolution"]:
-                            frame_to_save = cv2.resize(frame_to_save, self.params["output_resolution"])
-                        cv2.imwrite(os.path.join(output_dir["images"], "train", f"frame_{frame_counter}.jpg"), frame_to_save)
-
-                        if self.params["save_labels"]:
-                            self._save_yolo_labels(os.path.join(output_dir["labels"], "train"), model_name, frame_counter, results)
-
-                        if self.params["save_video"] and writers[model_name]:
-                            writers[model_name].write(annotated_frame)
-
-            print("🔍 DEBUG: Uscita dal ciclo di inferenza.")
+                    if self.params["save_labels"]:
+                        self._save_yolo_labels(os.path.join(output_dirs[model_name]["labels"], "train"), model_name, frame_counter, results)
 
         finally:
-            # Assicuriamoci di chiudere sempre tutto
             cap.release()
-            for writer in writers.values():
-                if writer:
-                    writer.release()
             cv2.destroyAllWindows()
-
-            # Forziamo la creazione del file data.yaml anche in caso di errore
-            if self.params["save_labels"]:
-                for model_name in self.models.keys():
-                    output_dir = output_dirs[model_name]["base"]
-
-                    print(f"🔍 DEBUG: Chiamata finale a _generate_data_yaml per {output_dir}")  
-                    self._generate_data_yaml(output_dir, self.static_class_name)
-
-            print("✅ DEBUG: Fine inferenza, dovrebbe essere stato creato data.yaml.")
