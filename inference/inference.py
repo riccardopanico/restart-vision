@@ -106,11 +106,16 @@ class InferenceEngine:
             print(f"❌ ERRORE: Impossibile scrivere il file data.yaml! Errore: {e}")
 
     def _process_image(self, grid):
-        """Inferenza su immagine per tutti i modelli selezionati."""
+        """Inferenza su immagine per tutti i modelli selezionati, con gestione della risoluzione."""
         frame = cv2.imread(self.source)
         if frame is None:
             st.error("Errore nel caricamento dell'immagine.")
             return
+
+        # ✅ Applichiamo la risoluzione selezionata se impostata
+        if self.params["output_resolution"]:
+            frame = cv2.resize(frame, self.params["output_resolution"])
+            print(f"🔍 DEBUG: Immagine ridimensionata a {self.params['output_resolution']}")
 
         for model_name, model in self.models.items():
             print(f"🔍 DEBUG: Elaborazione immagine con modello {model_name}")
@@ -121,7 +126,6 @@ class InferenceEngine:
             model.to(self.params["device"])
             results = model(frame, conf=self.params["confidence"], iou=self.params["iou_threshold"])
 
-            # ✅ Debug: Controlliamo i risultati del modello
             print(f"✅ DEBUG: {model_name} ha rilevato {len(results[0].boxes)} oggetti")
 
             annotated_frame = results[0].plot()
@@ -141,7 +145,7 @@ class InferenceEngine:
                     self._save_yolo_labels(os.path.join(output_dirs["labels"], "train"), model_name, 0, results)
 
     def _process_video(self, grid):
-        """Inferenza su video per tutti i modelli selezionati."""
+        """Inferenza su video per tutti i modelli selezionati, con gestione della risoluzione."""
         cap = cv2.VideoCapture(self.source)
         if not cap.isOpened():
             st.error("Errore nell'apertura del video o webcam.")
@@ -165,6 +169,11 @@ class InferenceEngine:
 
                 frame_counter += 1
 
+                # ✅ Applichiamo la risoluzione selezionata se impostata
+                if self.params["output_resolution"]:
+                    frame = cv2.resize(frame, self.params["output_resolution"])
+                    print(f"🔍 DEBUG: Frame {frame_counter} ridimensionato a {self.params['output_resolution']}")
+
                 for i, (model_name, model) in enumerate(self.models.items()):
                     print(f"🔍 DEBUG: Elaborazione frame {frame_counter} con modello {model_name}")
 
@@ -176,6 +185,18 @@ class InferenceEngine:
                     annotated_frame = results[0].plot()
                     frame_holders[i].image(annotated_frame, channels="BGR")
 
+                    # ✅ Ora salviamo le immagini dei frame processati, rispettando la risoluzione
+                    if self.params["save_output"]:
+                        frame_to_save = annotated_frame if self.params["save_annotated_frames"] else frame
+                        image_path = os.path.join(output_dirs[model_name]["images"], "train", f"frame_{frame_counter}.jpg")
+
+                        try:
+                            cv2.imwrite(image_path, frame_to_save)
+                            print(f"✅ DEBUG: Immagine salvata in {image_path} per modello {model_name}")
+                        except Exception as e:
+                            print(f"❌ ERRORE: Impossibile salvare {image_path}. Errore: {e}")
+
+                    # ✅ Ora salviamo le labels per ogni frame elaborato
                     if self.params["save_labels"]:
                         self._save_yolo_labels(os.path.join(output_dirs[model_name]["labels"], "train"), model_name, frame_counter, results)
 

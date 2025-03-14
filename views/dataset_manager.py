@@ -46,18 +46,28 @@ def merge_datasets(selected_datasets, target_name="merged_dataset", datasets_dir
                 source_folder = os.path.join(dataset_path, f"{data_type}/{split}")
                 target_folder = os.path.join(target_path, f"{data_type}/{split}")
 
-                if os.path.exists(source_folder):
+                print(f"🔍 DEBUG: Controllando {source_folder} -> {target_folder}")
+
+                if os.path.exists(source_folder) and os.listdir(source_folder):  # Verifica che la cartella non sia vuota
+                    print(f"📂 Trovati file in {source_folder}, procedo con la copia.")
+
                     for file in os.listdir(source_folder):
                         source_file = os.path.join(source_folder, file)
-
+                        
                         # ✅ Creiamo un nome univoco per evitare sovrascritture
                         file_extension = file.split(".")[-1]
                         file_base_name = file.replace(f".{file_extension}", "")
                         new_file_name = f"{model_name}_{session_name}_{file_base_name}.{file_extension}"
                         target_file = os.path.join(target_folder, new_file_name)
 
-                        shutil.copy(source_file, target_file)
-                        print(f"✅ Copiato {source_file} -> {target_file}")
+                        try:
+                            shutil.copy(source_file, target_file)
+                            print(f"✅ Copiato {source_file} -> {target_file}")
+                        except Exception as e:
+                            print(f"❌ ERRORE: Non sono riuscito a copiare {source_file}. Errore: {e}")
+
+                else:
+                    print(f"⚠️ ATTENZIONE: Nessun file trovato in {source_folder} o cartella vuota.")
 
     # ✅ Creiamo il file `data.yaml`
     yaml_path = os.path.join(target_path, "data.yaml")
@@ -75,6 +85,54 @@ def merge_datasets(selected_datasets, target_name="merged_dataset", datasets_dir
     print(f"✅ Merge completato in {target_path} con data.yaml generato!")
     return target_path
 
+def delete_dataset(dataset_path):
+    """Forza la rimozione completa di un dataset e della cartella, anche se rimane vuota o bloccata."""
+    try:
+        if os.path.exists(dataset_path):  # ✅ Verifica se la cartella esiste
+            
+            # ✅ Rimuoviamo tutto il contenuto della cartella
+            shutil.rmtree(dataset_path, ignore_errors=True)
+            time.sleep(0.5)  # 🔄 Attende un attimo per evitare blocchi
+
+            # ✅ Controlliamo se la cartella è ancora presente
+            if os.path.exists(dataset_path):
+                print(f"⚠️ ATTENZIONE: La cartella {dataset_path} non si è eliminata subito. Forziamo la rimozione.")
+
+                # ✅ Tentiamo di rimuovere eventuali file nascosti
+                for root, dirs, files in os.walk(dataset_path, topdown=False):
+                    for file in files:
+                        try:
+                            file_path = os.path.join(root, file)
+                            os.remove(file_path)
+                            print(f"🗑️ DEBUG: Eliminato file residuo {file_path}")
+                        except Exception as e:
+                            print(f"❌ ERRORE: Non posso eliminare {file_path}. Errore: {e}")
+
+                    for dir in dirs:
+                        try:
+                            dir_path = os.path.join(root, dir)
+                            os.rmdir(dir_path)
+                            print(f"🗑️ DEBUG: Eliminata cartella vuota {dir_path}")
+                        except Exception as e:
+                            print(f"❌ ERRORE: Non posso eliminare {dir_path}. Errore: {e}")
+
+                # ✅ Ultimo tentativo di eliminazione della cartella
+                try:
+                    os.rmdir(dataset_path)
+                    print(f"✅ DEBUG: Cartella {dataset_path} rimossa con successo dopo pulizia.")
+                except Exception as e:
+                    print(f"❌ ERRORE: La cartella {dataset_path} è ancora presente. Errore: {e}")
+                    return False
+
+            print(f"✅ DEBUG: Dataset eliminato {dataset_path}")
+            return True
+        else:
+            print(f"⚠️ ATTENZIONE: Il dataset {dataset_path} non esiste già.")
+            return False
+    except Exception as e:
+        print(f"❌ ERRORE: Impossibile eliminare {dataset_path}. Errore: {e}")
+        return False
+
 def dataset_management_ui():
     """Interfaccia Streamlit per la gestione dei dataset generati dall'inferenza."""
     st.sidebar.subheader("Gestione Dataset")
@@ -87,22 +145,28 @@ def dataset_management_ui():
         return
 
     # Mostriamo i dataset in una tabella interattiva
-    st.subheader("Seleziona i dataset da unire")
+    st.subheader("Seleziona i dataset da unire o eliminare")
 
     selected_datasets = []
     for dataset in datasets:
-        col1, col2, col3 = st.columns([3, 2, 1])
-        
+        col1, col2, col3, col4 = st.columns([3, 2, 1, 1])  # Aggiunto un nuovo bottone per eliminare
+
         with col1:
             st.text(f"📂 {dataset['modello']}")
-        
         with col2:
             st.text(f"📅 {dataset['data']}")
-        
         with col3:
             selected = st.checkbox("Seleziona", key=f"{dataset['modello']}_{dataset['data']}")
             if selected:
                 selected_datasets.append(dataset)
+        with col4:
+            delete_button = st.button("🗑️", key=f"delete_{dataset['modello']}_{dataset['data']}")
+            if delete_button:
+                if delete_dataset(dataset["path"]):
+                    st.success(f"✅ Dataset `{dataset['modello']}` eliminato con successo.")
+                    st.rerun()  # ✅ Sostituito st.experimental_rerun() con st.rerun()
+                else:
+                    st.error(f"❌ Errore nell'eliminazione di `{dataset['modello']}`.")
 
     # ✅ Impediamo il merge se nessun dataset è selezionato
     if not selected_datasets:
