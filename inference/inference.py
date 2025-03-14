@@ -11,7 +11,7 @@ class InferenceEngine:
         self.models = models
         self.source_type = source_type
         self.source = source
-        self.session_id = session_id
+        self.session_id = session_id if session_id is not None else "default_session"
         self.static_class_id = static_class_id  # ✅ Memorizziamo l'ID fisso scelto dall'utente
         self.params = params
         self.detected_classes = set()  # Traccia le classi rilevate
@@ -28,6 +28,9 @@ class InferenceEngine:
 
     def _create_output_dir(self, model_name):
         """Crea la struttura di cartelle per il modello e la sessione."""
+        if self.session_id is None:
+            self.session_id = "default_session"  # Usa un valore di fallback
+
         base_output_dir = os.path.join("output", model_name, self.session_id)
         os.makedirs(base_output_dir, exist_ok=True)
 

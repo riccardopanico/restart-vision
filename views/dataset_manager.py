@@ -31,24 +31,24 @@ def list_datasets(output_dir="output"):
 def merge_datasets(selected_datasets, target_name="merged_dataset", datasets_dir="datasets", class_list=[]):
     """Unisce più dataset in un'unica cartella, rinomina i file e mantiene la struttura YOLO (train, val, test)."""
 
-    # Creazione della cartella target con struttura YOLO
-    target_path = os.path.join(datasets_dir, target_name)
+    # ✅ Creazione della cartella target con struttura YOLO
+    target_path = os.path.abspath(os.path.join(datasets_dir, target_name))
     for folder in ["images/train", "images/val", "images/test", "labels/train", "labels/val", "labels/test"]:
         os.makedirs(os.path.join(target_path, folder), exist_ok=True)
 
     for dataset in selected_datasets:
         model_name = dataset["modello"]
         session_name = dataset["data"]
-        dataset_path = dataset["path"]
+        dataset_path = os.path.abspath(dataset["path"])  # Percorso assoluto del dataset
 
         for data_type in ["images", "labels"]:  
-            for split in ["train", "val", "test"]:  # Assicuriamoci che train, val, test siano gestiti
+            for split in ["train", "val", "test"]:  # Gestione di train, val, test
                 source_folder = os.path.join(dataset_path, f"{data_type}/{split}")
                 target_folder = os.path.join(target_path, f"{data_type}/{split}")
 
                 print(f"🔍 DEBUG: Controllando {source_folder} -> {target_folder}")
 
-                if os.path.exists(source_folder) and os.listdir(source_folder):  # Verifica che la cartella non sia vuota
+                if os.path.exists(source_folder) and os.listdir(source_folder):  # Verifica cartella non vuota
                     print(f"📂 Trovati file in {source_folder}, procedo con la copia.")
 
                     for file in os.listdir(source_folder):
@@ -69,63 +69,44 @@ def merge_datasets(selected_datasets, target_name="merged_dataset", datasets_dir
                 else:
                     print(f"⚠️ ATTENZIONE: Nessun file trovato in {source_folder} o cartella vuota.")
 
-    # ✅ Creiamo il file `data.yaml`
+    # ✅ Creazione del file `data.yaml` con percorsi assoluti
     yaml_path = os.path.join(target_path, "data.yaml")
     data_yaml = {
-        "train": os.path.join(target_path, "images/train"),
-        "val": os.path.join(target_path, "images/val"),
-        "test": os.path.join(target_path, "images/test"),
+        "train": os.path.abspath(os.path.join(target_path, "images/train")),
+        "val": os.path.abspath(os.path.join(target_path, "images/val")),
+        "test": os.path.abspath(os.path.join(target_path, "images/test")),
         "nc": len(class_list),
         "names": class_list
     }
 
-    with open(yaml_path, "w") as file:
-        yaml.dump(data_yaml, file, default_flow_style=False)
+    try:
+        with open(yaml_path, "w") as file:
+            yaml.dump(data_yaml, file, default_flow_style=False)
+        print(f"✅ File `data.yaml` creato correttamente in {yaml_path}")
+    except Exception as e:
+        print(f"❌ ERRORE: Impossibile scrivere il file `data.yaml`. Errore: {e}")
 
     print(f"✅ Merge completato in {target_path} con data.yaml generato!")
     return target_path
 
 def delete_dataset(dataset_path):
-    """Forza la rimozione completa di un dataset e della cartella, anche se rimane vuota o bloccata."""
+    """Forza la rimozione completa di un dataset, inclusa la cartella vuota."""
     try:
-        if os.path.exists(dataset_path):  # ✅ Verifica se la cartella esiste
-            
-            # ✅ Rimuoviamo tutto il contenuto della cartella
+        if os.path.exists(dataset_path):
             shutil.rmtree(dataset_path, ignore_errors=True)
             time.sleep(0.5)  # 🔄 Attende un attimo per evitare blocchi
 
-            # ✅ Controlliamo se la cartella è ancora presente
+            # Controllo finale: se la cartella esiste ancora, tentiamo di eliminarla nuovamente
             if os.path.exists(dataset_path):
-                print(f"⚠️ ATTENZIONE: La cartella {dataset_path} non si è eliminata subito. Forziamo la rimozione.")
+                print(f"⚠️ ATTENZIONE: La cartella {dataset_path} non si è eliminata subito. Ritentiamo...")
+                shutil.rmtree(dataset_path, ignore_errors=True)
 
-                # ✅ Tentiamo di rimuovere eventuali file nascosti
-                for root, dirs, files in os.walk(dataset_path, topdown=False):
-                    for file in files:
-                        try:
-                            file_path = os.path.join(root, file)
-                            os.remove(file_path)
-                            print(f"🗑️ DEBUG: Eliminato file residuo {file_path}")
-                        except Exception as e:
-                            print(f"❌ ERRORE: Non posso eliminare {file_path}. Errore: {e}")
-
-                    for dir in dirs:
-                        try:
-                            dir_path = os.path.join(root, dir)
-                            os.rmdir(dir_path)
-                            print(f"🗑️ DEBUG: Eliminata cartella vuota {dir_path}")
-                        except Exception as e:
-                            print(f"❌ ERRORE: Non posso eliminare {dir_path}. Errore: {e}")
-
-                # ✅ Ultimo tentativo di eliminazione della cartella
-                try:
-                    os.rmdir(dataset_path)
-                    print(f"✅ DEBUG: Cartella {dataset_path} rimossa con successo dopo pulizia.")
-                except Exception as e:
-                    print(f"❌ ERRORE: La cartella {dataset_path} è ancora presente. Errore: {e}")
-                    return False
-
-            print(f"✅ DEBUG: Dataset eliminato {dataset_path}")
-            return True
+            if not os.path.exists(dataset_path):
+                print(f"✅ Dataset eliminato correttamente: {dataset_path}")
+                return True
+            else:
+                print(f"❌ ERRORE: Il dataset {dataset_path} non è stato eliminato completamente.")
+                return False
         else:
             print(f"⚠️ ATTENZIONE: Il dataset {dataset_path} non esiste già.")
             return False
@@ -143,9 +124,12 @@ def dataset_management_ui():
     if not datasets:
         st.sidebar.warning("⚠️ Nessun dataset trovato in `output/`.")
         return
+    
+    st.subheader("🗂️ Gestione Dataset")
 
-    # Mostriamo i dataset in una tabella interattiva
-    st.subheader("Seleziona i dataset da unire o eliminare")
+    # ✅ Aggiunta pulsante per aggiornare la lista
+    if st.button("🔄 Aggiorna lista"):
+        st.rerun()
 
     selected_datasets = []
     for dataset in datasets:

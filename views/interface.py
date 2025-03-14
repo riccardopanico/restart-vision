@@ -4,6 +4,7 @@ from views.inference_params import set_inference_parameters
 from views.output_params import select_source, upload_file
 from views.dataset_manager import dataset_management_ui
 from inference.inference import InferenceEngine
+from views.training_ui import training_interface
 from datetime import datetime
 
 def run_app():
@@ -13,6 +14,9 @@ def run_app():
     
     st.sidebar.header("Gestione Dataset")
     dataset_management_ui()
+    
+    st.sidebar.header("Training YOLOv8")
+    training_interface()
 
     # Selezione modelli e sorgente
     models = select_models()
