@@ -7,11 +7,12 @@ from ultralytics import YOLO
 class InferenceEngine:
     """Classe per eseguire inferenza YOLOv8 separata dalla UI."""
 
-    def __init__(self, models, source_type, source, session_id, **params):
+    def __init__(self, models, source_type, source, session_id, static_class_name=None, **params):
         self.models = models
         self.source_type = source_type
         self.source = source
         self.session_id = session_id
+        self.static_class_name = static_class_name  # ✅ Memorizziamo la classe fissa
         self.params = params
         self.detected_classes = set()  # Traccia le classi rilevate
 
@@ -47,53 +48,59 @@ class InferenceEngine:
             "labels": labels_dir,
             "videos": videos_dir
         }
-
+        
     def _save_yolo_labels(self, labels_dir, model_name, frame_counter, results):
-        """Salva le etichette YOLO in un file di testo e aggiorna le classi rilevate."""
+        """Salva le etichette YOLO in un file di testo e assegna l'ID statico alla classe selezionata."""
         label_file = os.path.join(labels_dir, f"frame_{frame_counter}.txt")
 
         print(f"🔍 DEBUG: Salvataggio labels in {label_file}")
 
         with open(label_file, "w") as f:
             for box in results[0].boxes:
-                class_id = int(box.cls)
-                self.detected_classes.add(class_id)  # Registra la classe trovata
+                original_class_id = int(box.cls)
 
-                print(f"✅ DEBUG: Classe rilevata e aggiunta: {class_id}")  # Nuovo debug
+                # ✅ Ottieni la mappa delle classi YOLO
+                class_name_mapping = self.models[model_name].names  # Dizionario {id: 'nome_classe'}
+
+                # ✅ Trova il corrispondente class_id per `static_class_name`
+                new_class_id = None
+                for id, name in class_name_mapping.items():
+                    if name == self.static_class_name:
+                        new_class_id = id
+                        break  # Fermati non appena troviamo il match
+
+                if new_class_id is None:
+                    print(f"⚠️ ERRORE: La classe '{self.static_class_name}' non è stata trovata tra i nomi YOLO!")
+                    continue  # Saltiamo questa iterazione se non troviamo la classe
+
+                print(f"✅ DEBUG: Classe originale {original_class_id}, nuova classe {new_class_id} ({self.static_class_name})") 
 
                 x_center, y_center, width, height = box.xywhn.tolist()[0]
-                f.write(f"{class_id} {x_center} {y_center} {width} {height}\n")
-                
-    def _generate_data_yaml(self, output_dir):
-        """Genera il file data.yaml in base alle classi trovate."""
+                f.write(f"{new_class_id} {x_center} {y_center} {width} {height}\n")
 
-        # DEBUG: Stampa le classi rilevate
-        print(f"🔍 DEBUG: Classi rilevate prima di creare data.yaml: {self.detected_classes}")
-
-        # Forziamo la creazione della cartella se non esiste
-        os.makedirs(output_dir, exist_ok=True)
+    def _generate_data_yaml(self, output_dir, static_class_name):
+        """Genera il file data.yaml con un solo ID fisso per tutte le classi selezionate."""
 
         yaml_path = os.path.join(output_dir, "data.yaml")
 
-        # Se non ci sono classi rilevate, inseriamo almeno una classe di default
-        if not self.detected_classes:
-            print("⚠️ DEBUG: Nessuna classe rilevata, aggiungo una classe di default.")
-            self.detected_classes = {0}  # Forziamo almeno una classe
+        if not static_class_name:
+            print("⚠️ DEBUG: Nessuna classe selezionata come ID fisso, il file data.yaml non verrà creato.")
+            return
 
         data_yaml = {
-            "train": "dataset/images/train",
-            "val": "dataset/images/val",
-            "test": "dataset/images/test",
-            "nc": len(self.detected_classes),
-            "names": [f"model_{cls}" for cls in sorted(self.detected_classes)]
+            "train": "images/train",
+            "val": "images/val",
+            "test": "images/test",
+            "nc": 1,  # Un'unica classe di riferimento
+            "names": [static_class_name]
         }
 
-        # Scriviamo il file YAML
+        # Scrittura del file data.yaml
         try:
             with open(yaml_path, "w") as file:
                 yaml.dump(data_yaml, file, default_flow_style=False)
             
-            print(f"✅ DEBUG: File data.yaml salvato in: {yaml_path}")
+            print(f"✅ DEBUG: File data.yaml creato con classe fissa '{static_class_name}' in: {yaml_path}")
 
         except Exception as e:
             print(f"❌ ERRORE: Impossibile scrivere il file data.yaml! Errore: {e}")
@@ -205,6 +212,6 @@ class InferenceEngine:
                     output_dir = output_dirs[model_name]["base"]
 
                     print(f"🔍 DEBUG: Chiamata finale a _generate_data_yaml per {output_dir}")  
-                    self._generate_data_yaml(output_dir)
+                    self._generate_data_yaml(output_dir, self.static_class_name)
 
             print("✅ DEBUG: Fine inferenza, dovrebbe essere stato creato data.yaml.")

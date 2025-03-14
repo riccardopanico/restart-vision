@@ -27,7 +27,25 @@ def run_app():
 
     # Creazione istanza dell'engine
     session_id = datetime.now().strftime("%Y-%m-%d_%H-%M-%S") if params["save_output"] else None
-    engine = InferenceEngine(models, source_type, source, session_id, **params)
 
-    if st.sidebar.button("Avvia Inferenza"):
+    # Input manuale delle classi
+    st.sidebar.subheader("Inserisci le Classi")
+    class_input = st.sidebar.text_area(
+        "Inserisci le classi (una per riga):",
+        placeholder="Es: persona\nauto\nbicicletta"
+    )
+
+    # Parsing delle classi inserite
+    class_list = [cls.strip() for cls in class_input.split("\n") if cls.strip()]
+
+    selected_class = None
+    if class_list:
+        st.sidebar.subheader("Seleziona la Classe di Riferimento")
+        selected_class = st.sidebar.radio("Classe da usare come ID fisso:", class_list)
+
+    # Creazione istanza dell'engine con la classe fissa selezionata
+    engine = InferenceEngine(models, source_type, source, session_id, static_class_name=selected_class, **params)
+    
+    # Avvio inferenza con classi selezionate e ID fisso
+    if st.sidebar.button("Avvia Inferenza") and selected_class:
         engine.run(num_columns)
