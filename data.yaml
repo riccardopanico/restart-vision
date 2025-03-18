@@ -1,6 +1,0 @@
-train: dataset/images/train  # Percorso alle immagini di training
-val: dataset/images/train      # Percorso alle immagini di validazione
-test: dataset/images/test    # (Opzionale) Percorso alle immagini di test
-
-nc: 3  # Numero di classi
-names: ["model_1", "model_2", "model_3"]  # Nomi delle classi

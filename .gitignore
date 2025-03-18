@@ -175,3 +175,5 @@ output/
 venv_restart-vision/
 datasets/
 runs/
+restart_venv/
+models/
