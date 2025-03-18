@@ -5,13 +5,14 @@ def set_inference_parameters(source_type):
     """Configura i parametri di inferenza per YOLOv8."""
     st.sidebar.subheader("📌 Parametri Inferenza")
     
+    # ✅ Evitiamo il refresh impostando i valori di default solo al primo avvio
     confidence = st.sidebar.slider("Confidence Threshold", 0.0, 1.0, 0.5, 0.01)
     iou_threshold = st.sidebar.slider("IoU Threshold", 0.0, 1.0, 0.45, 0.01)
     
-    device = "cuda" if st.sidebar.checkbox("⚡ Usa CUDA se disponibile", value=True) and torch.cuda.is_available() else "cpu"
+    device = "cuda" if torch.cuda.is_available() and st.sidebar.checkbox("⚡ Usa CUDA se disponibile", value=True) else "cpu"
     
     save_output = st.sidebar.checkbox("💾 Salva output inferenza", value=False)
-    save_video, save_frames, save_annotated_frames, save_labels, save_crop_boxes = False, False, False, False, False
+    save_video = save_frames = save_annotated_frames = save_labels = save_crop_boxes = False
     images_folder = "images"
 
     if save_output:
@@ -22,14 +23,13 @@ def set_inference_parameters(source_type):
         if save_frames:
             save_labels = st.sidebar.checkbox("📝 Salva labels YOLO", value=False)
             save_crop_boxes = st.sidebar.checkbox("✂️ Salva crop dei bounding box", value=False)
-            images_folder = st.sidebar.text_input("📂 Nome cartella immagini (default: images)", value="images") or "images"
+            images_folder = st.sidebar.text_input("📂 Nome cartella immagini", value="images")
             save_annotated_frames = st.sidebar.checkbox("📍 Salva frames con box", value=True)
 
     save_output = save_output and (save_video or save_frames)
 
-    frame_skip = 1
-    if source_type in ["video", "webcam"]:
-        frame_skip = st.sidebar.slider("🎞️ Inferenza ogni N frame", 1, 30, 1)
+    # ✅ Frame skipping solo se inferenza su video/webcam
+    frame_skip = 1 if source_type not in ["video", "webcam"] else st.sidebar.slider("🎞️ Inferenza ogni N frame", 1, 30, 1)
 
     st.sidebar.subheader("📏 Risoluzione Output")
     resolution_options = {

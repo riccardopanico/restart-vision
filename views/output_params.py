@@ -17,19 +17,17 @@ def list_available_cameras(max_cameras=5):
 def select_source():
     """Seleziona la sorgente dell'inferenza."""
     source_options = ["webcam", "video", "image"]
-
-    if "source_type" not in st.session_state:
-        st.session_state["source_type"] = source_options[0]  # Imposta il default come "webcam"
-
+    
     return st.sidebar.selectbox(
         "📡 Seleziona la sorgente",
         source_options,
-        index=source_options.index(st.session_state["source_type"]),
+        index=0,  # ✅ Imposta sempre la prima voce come predefinita
         key="source_select"
     )
 
 def upload_file(source_type):
-    """Gestisce il caricamento del file video o immagine."""
+    """Gestisce il caricamento del file video o immagine e seleziona la webcam."""
+    
     if source_type in ["video", "image"]:
         file_types = ["mp4", "mov", "avi", "mkv"] if source_type == "video" else ["jpg", "jpeg", "png"]
         media_file = st.sidebar.file_uploader("📤 Carica un file", type=file_types, key="file_upload")
@@ -48,8 +46,9 @@ def upload_file(source_type):
         available_cameras = list_available_cameras()
         if available_cameras:
             selected_camera = st.sidebar.selectbox("📸 Seleziona una webcam:", available_cameras, key="webcam_select")
+
             try:
-                return int(selected_camera.split()[-1][:-1])  # ✅ Converte "Webcam X (Index Y)" in indice Y
+                return int(selected_camera.split()[-1][1:-1])  # ✅ Converte "Webcam X (Index Y)" in Y
             except ValueError:
                 st.sidebar.error("⚠️ Errore nella selezione della webcam.")
                 return None
