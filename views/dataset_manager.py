@@ -75,15 +75,12 @@ def delete_dataset(dataset_path):
     return False
 
 def dataset_management_ui():
-    st.sidebar.subheader("Gestione Dataset")
     datasets = list_datasets()
 
     if not datasets:
         st.sidebar.warning("⚠️ Nessun dataset trovato in `output/`.")
         return
     
-    st.subheader("🗂️ Gestione Dataset")
-
     if st.button("🔄 Aggiorna lista"):
         st.rerun()
 

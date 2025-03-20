@@ -43,7 +43,6 @@ def set_inference_parameters(source_type):
     params["frame_skip"] = st.sidebar.slider("🎞️ Inferenza ogni N frame", 1, 30, params["frame_skip"])
     params["num_workers"] = st.sidebar.slider("🛠️ Worker inferenza", 1, 8, params["num_workers"])
 
-    st.sidebar.subheader("📏 Risoluzione Output")
     resolution_options = {
         "Usa risoluzione originale": None,
         "YOLO Default (640x640)": (640, 640),

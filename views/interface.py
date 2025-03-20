@@ -8,12 +8,11 @@ from views.training_ui import training_interface
 from datetime import datetime
 
 def run_app():
-    st.title("YOLOv8 Model Inference")
+    st.title("YOLO Model Inference")
 
-    st.sidebar.header("Gestione Dataset")
     dataset_management_ui()
 
-    st.sidebar.header("Training YOLOv8")
+    st.sidebar.header("Training YOLO")
     training_interface()
 
     models = select_models()
