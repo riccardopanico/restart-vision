@@ -1,3 +1,4 @@
+import os
 import torch
 import streamlit as st
 
@@ -41,7 +42,7 @@ def set_inference_parameters(source_type):
             params["save_annotated_frames"] = st.sidebar.checkbox("📍 Salva frames con box", value=params["save_annotated_frames"])
 
     params["frame_skip"] = st.sidebar.slider("🎞️ Inferenza ogni N frame", 1, 30, params["frame_skip"])
-    params["num_workers"] = st.sidebar.slider("🛠️ Worker inferenza", 1, 8, params["num_workers"])
+    params["num_workers"] = st.sidebar.slider("🛠️ Worker inferenza", 1, min(8, os.cpu_count() or 4), params["num_workers"])
 
     resolution_options = {
         "Usa risoluzione originale": None,

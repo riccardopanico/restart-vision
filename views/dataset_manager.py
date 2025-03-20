@@ -114,7 +114,7 @@ def dataset_management_ui():
     dataset_name = st.text_input("Nome per il dataset unito:", st.session_state.dataset_name, key="dataset_name_input")
     st.session_state.dataset_name = dataset_name
 
-    class_list = st.session_state.get("class_input", "class_1\nclass_2\nclass_3").split("\n")
+    class_list = st.session_state.get("class_input", "model_1\nmodel_2\nmodel_3").split("\n")
     class_list = [cls.strip() for cls in class_list if cls.strip()]
 
     if st.button("Conferma/Merge"):

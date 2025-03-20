@@ -27,7 +27,7 @@ def run_app():
     params = set_inference_parameters(source_type)
 
     st.sidebar.subheader("Inserisci le Classi")
-    default_classes = "class_1\nclass_2\nclass_3"
+    default_classes = "model_1\nmodel_2\nmodel_3"
 
     class_input = st.sidebar.text_area("Inserisci le classi (una per riga):",
                                        value=st.session_state.get("class_input", default_classes),
