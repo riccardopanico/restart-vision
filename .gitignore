@@ -177,3 +177,5 @@ datasets/
 runs/
 restart_venv/
 models/
+acquisizione_lgm/
+temp/
