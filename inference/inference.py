@@ -127,9 +127,15 @@ class InferenceEngine:
             self.video_writers[model_name].release()
 
     def _save_frame_and_labels(self, frame, annotated_frame, output_dir, model_name, frame_counter, results):
+        has_detections = len(results[0].boxes) > 0  # ✅ Controlla se ci sono oggetti rilevati
+
+        # Se il checkbox "Salva solo se ci sono box" è attivo e non ci sono detections, esce subito
+        if self.params["save_only_with_detections"] and not has_detections:
+            return
+
         if self.params["save_frames"]:
             frame_to_save = annotated_frame if self.params["save_annotated_frames"] else frame
-            image_path = os.path.join(output_dir["images"], f"frame_{frame_counter}.jpg")
+            image_path = os.path.join(output_dir["images"], "train", f"frame_{frame_counter}.jpg")
             cv2.imwrite(image_path, frame_to_save)
 
         if self.params["save_video"]:
@@ -140,6 +146,7 @@ class InferenceEngine:
 
         if self.params.get("save_crop_boxes", False):
             self._save_cropped_boxes(frame, output_dir["crops"], frame_counter, results)
+
 
     def _save_cropped_boxes(self, frame, crops_dir, frame_counter, results):
         os.makedirs(crops_dir, exist_ok=True)
