@@ -20,49 +20,58 @@ def list_datasets():
             for session in os.listdir(model_path):
                 session_path = os.path.join(model_path, session)
                 if os.path.isdir(session_path):
-                    datasets.append({
-                        "modello": model_name,
-                        "data": session,
-                        "path": session_path
-                    })
+                    for split in ["train", "val", "test"]:
+                        images_path = os.path.join(session_path, split, "images")
+                        labels_path = os.path.join(session_path, split, "labels")
+                        if os.path.exists(images_path) and os.path.exists(labels_path):
+                            datasets.append({
+                                "modello": model_name,
+                                "data": session,
+                                "path": session_path,
+                                "split": split
+                            })
     return datasets
 
 def merge_datasets(selected_datasets, target_name="merged_dataset", class_list=[]):
     target_path = os.path.abspath(os.path.join(DATASETS_DIR, target_name))
     os.makedirs(target_path, exist_ok=True)
 
-    for folder in ["images/train", "images/val", "images/test", "labels/train", "labels/val", "labels/test"]:
-        os.makedirs(os.path.join(target_path, folder), exist_ok=True)
+    for split in ["train", "val", "test"]:
+        os.makedirs(os.path.join(target_path, split, "images"), exist_ok=True)
+        os.makedirs(os.path.join(target_path, split, "labels"), exist_ok=True)
 
     for dataset in selected_datasets:
         model_name = dataset["modello"]
         session_name = dataset["data"]
+        split = dataset["split"]
         dataset_path = os.path.abspath(dataset["path"])
 
         for data_type in ["images", "labels"]:
-            for split in ["train", "val", "test"]:
-                source_folder = os.path.join(dataset_path, f"{data_type}/{split}")
-                target_folder = os.path.join(target_path, f"{data_type}/{split}")
+            source_folder = os.path.join(dataset_path, split, data_type)
+            target_folder = os.path.join(target_path, split, data_type)
 
-                if os.path.exists(source_folder) and os.listdir(source_folder):
-                    for file in os.listdir(source_folder):
-                        source_file = os.path.join(source_folder, file)
-                        file_ext = file.split(".")[-1]
-                        file_base = file.replace(f".{file_ext}", "")
-                        new_file_name = f"{model_name}_{session_name}_{file_base}.{file_ext}"
-                        shutil.copy(source_file, os.path.join(target_folder, new_file_name))
+            if os.path.exists(source_folder) and os.listdir(source_folder):
+                for file in os.listdir(source_folder):
+                    source_file = os.path.join(source_folder, file)
+                    file_ext = file.split(".")[-1]
+                    file_base = file.replace(f".{file_ext}", "")
+                    new_file_name = f"{model_name}_{session_name}_{file_base}.{file_ext}"
+                    shutil.copy(source_file, os.path.join(target_folder, new_file_name))
 
     yaml_path = os.path.join(target_path, "data.yaml")
     data_yaml = {
-        "train": os.path.abspath(os.path.join(target_path, "images/train")),
-        "val": os.path.abspath(os.path.join(target_path, "images/val")),
-        "test": os.path.abspath(os.path.join(target_path, "images/test")),
+        # "train": os.path.abspath(os.path.join(target_path, "train", "images")),
+        # "val": os.path.abspath(os.path.join(target_path, "val", "images")),
+        # "test": os.path.abspath(os.path.join(target_path, "test", "images")),
+        "train": "train/images",
+        "val": "val/images",
+        "test": "test/images",
         "nc": len(class_list),
         "names": class_list
     }
 
     with open(yaml_path, "w") as file:
-        yaml.dump(data_yaml, file, default_flow_style=False)
+        yaml.dump(data_yaml, file, default_flow_style=False, allow_unicode=True)
 
     return target_path
 
@@ -80,24 +89,26 @@ def dataset_management_ui():
     if not datasets:
         st.sidebar.warning("⚠️ Nessun dataset trovato in `output/`.")
         return
-    
+
     if st.button("🔄 Aggiorna lista"):
         st.rerun()
 
     selected_datasets = []
     for dataset in datasets:
-        col1, col2, col3, col4 = st.columns([3, 2, 1, 1])
+        col1, col2, col3, col4, col5 = st.columns([3, 2, 1, 1, 1])
 
         with col1:
             st.text(f"📂 {dataset['modello']}")
         with col2:
             st.text(f"📅 {dataset['data']}")
         with col3:
-            selected = st.checkbox("Seleziona", key=f"{dataset['modello']}_{dataset['data']}")
+            st.text(f"🔹 {dataset['split']}")
+        with col4:
+            selected = st.checkbox("Seleziona", key=f"{dataset['modello']}_{dataset['data']}_{dataset['split']}")
             if selected:
                 selected_datasets.append(dataset)
-        with col4:
-            if st.button("🗑️", key=f"delete_{dataset['modello']}_{dataset['data']}"):
+        with col5:
+            if st.button("🗑️", key=f"delete_{dataset['modello']}_{dataset['data']}_{dataset['split']}"):
                 if delete_dataset(dataset["path"]):
                     st.success(f"✅ Dataset `{dataset['modello']}` eliminato con successo.")
                     st.rerun()

@@ -16,7 +16,6 @@ def set_inference_parameters(source_type):
             "save_annotated_frames": False,
             "save_labels": False,
             "save_crop_boxes": False,
-            "images_folder": "images",
             "frame_skip": 1,
             "output_resolution": None,
             "num_workers": 4  # Default: usa 4 worker
@@ -38,8 +37,8 @@ def set_inference_parameters(source_type):
         if params["save_frames"]:
             params["save_labels"] = st.sidebar.checkbox("📝 Salva labels YOLO", value=params["save_labels"])
             params["save_crop_boxes"] = st.sidebar.checkbox("✂️ Salva crop dei bounding box", value=params["save_crop_boxes"])
-            params["images_folder"] = st.sidebar.text_input("📂 Cartella immagini", value=params["images_folder"])
             params["save_annotated_frames"] = st.sidebar.checkbox("📍 Salva frames con box", value=params["save_annotated_frames"])
+            params["save_only_with_detections"] = st.sidebar.checkbox("💾 Salva solo se ci sono box", value=False)
 
     params["frame_skip"] = st.sidebar.slider("🎞️ Inferenza ogni N frame", 1, 30, params["frame_skip"])
     params["num_workers"] = st.sidebar.slider("🛠️ Worker inferenza", 1, min(8, os.cpu_count() or 4), params["num_workers"])
