@@ -67,7 +67,7 @@ def training_interface():
 
     st.write("---")
     
-    freeze_value = st.sidebar.slider("Numero di layer da congelare (freeze)", 0, 30, 0)
+    freeze_value = st.sidebar.slider("Numero di layer da congelare (freeze)", 0, 23, 0)
 
     start_tensorboard = st.sidebar.checkbox("Lancia TensorBoard", value=False)
     tb_process = None
